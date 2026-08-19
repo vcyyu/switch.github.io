@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>物联网开关控制面板</title>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui, sans-serif;}
+body{
+    min-height:100vh;
+    background: linear-gradient(145deg,#0f1420,#1a2436);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    padding:20px;
+}
+.wrap{
+    width:100%;
+    max-width:460px;
+}
+.card{
+    background:rgba(255,255,255,0.06);
+    backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:24px;
+    padding:36px 28px;
+    box-shadow:0 10px 40px rgba(0,0,0,0.35);
+}
+.title{
+    text-align:center;
+    font-size:24px;
+    margin-bottom:30px;
+    letter-spacing:1px;
+}
+.status-box{
+    text-align:center;
+    padding:16px;
+    border-radius:16px;
+    background:rgba(255,255,255,0.05);
+    margin-bottom:32px;
+    font-size:18px;
+}
+#stateText{
+    font-weight:bold;
+    font-size:20px;
+    color:#ff6b6b;
+}
+.btn-group{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+}
+button{
+    border:none;
+    padding:18px 0;
+    border-radius:14px;
+    font-size:19px;
+    font-weight:bold;
+    cursor:pointer;
+    transition:0.22s ease;
+}
+#btnOn{
+    background:linear-gradient(135deg,#27ae60,#2ecc71);
+    color:white;
+}
+#btnOff{
+    background:linear-gradient(135deg,#c0392b,#e74c3c);
+    color:white;
+}
+button:active{transform:scale(0.96);}
+.connect-tip{
+    text-align:center;
+    margin-top:24px;
+    font-size:14px;
+    opacity:0.75;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="card">
+        <h2 class="title">继电器开关控制器</h2>
+        <div class="status-box">
+            当前设备状态：<span id="stateText">等待指令...</span>
+        </div>
+        <div class="btn-group">
+            <button id="btnOn">开启 ON</button>
+            <button id="btnOff">关闭 OFF</button>
+        </div>
+    </div>
+    <div class="connect-tip" id="connTip">MQTT 正在连接服务器</div>
+</div>
+
+<script>
+// ============【这里修改成你自己EMQX Cloud信息！】============
+const mqttWsUrl  = "wss://i11884f9.ala.cn-hangzhou.emqxsl.cn:8084/mqtt";
+const mqtt_port = 8084;
+const mqttUser   = "esp-switch01";
+const mqttPasswd = "switch666888";
+const CMD_TOPIC  = "light/switch/cmd";
+const STATE_TOPIC= "light/switch/state";
+// =========================================================
+
+const connTip = document.getElementById("connTip");
+const stateText = document.getElementById("stateText");
+
+// 创建连接
+const client = mqtt.connect(mqttWsUrl,{
+    username:mqttUser,
+    password:mqttPasswd,
+    clientId:"web_switch_"+Math.random().toString(36).slice(2,12)
+});
+
+// 连接成功
+client.on("connect",()=>{
+    connTip.innerText = "✅ MQTT服务器连接成功";
+    client.subscribe(STATE_TOPIC);
+});
+
+// 接收设备上报状态
+client.on("message",(topic,payload)=>{
+    const msg = payload.toString().trim();
+    stateText.innerText = msg;
+    if(msg === "ON") stateText.style.color="#2ecc71";
+    else stateText.style.color="#ff6b6b";
+});
+
+// 连接失败
+client.on("error",(err)=>{
+    connTip.innerText = "❌ 连接失败，请检查地址/账号";
+    console.error(err);
+});
+
+// 发送开关指令
+document.getElementById("btnOn").onclick = ()=>{
+    client.publish(CMD_TOPIC,"ON");
+};
+document.getElementById("btnOff").onclick = ()=>{
+    client.publish(CMD_TOPIC,"OFF");
+};
+</script>
+</body>
+</html>
