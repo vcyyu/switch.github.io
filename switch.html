@@ -43,6 +43,14 @@ body{
     margin-bottom:32px;
     font-size:18px;
 }
+/*新增硬件设备状态行样式*/
+.hw-status{
+    margin-bottom:10px;
+    font-size:17px;
+}
+#hwStateText{
+    font-weight:bold;
+}
 #stateText{
     font-weight:bold;
     font-size:20px;
@@ -84,7 +92,10 @@ button:active{transform:scale(0.96);}
     <div class="card">
         <h2 class="title">继电器开关控制器</h2>
         <div class="status-box">
-            当前设备状态：<span id="stateText">等待指令...</span>
+            <div class="hw-status">
+                ESP设备状态：<span id="hwStateText">未知</span>
+            </div>
+            当前设备状态：<span id="stateText">等待连接...</span>
         </div>
         <div class="btn-group">
             <button id="btnOn">开启 ON</button>
@@ -93,45 +104,90 @@ button:active{transform:scale(0.96);}
     </div>
     <div class="connect-tip" id="connTip">MQTT 正在连接服务器</div>
 </div>
-
 <script>
 // ============【这里修改成你自己EMQX Cloud信息！】============
+// 浏览器WebSocket TLS地址，端口8084，末尾必须带/mqtt
 const mqttWsUrl  = "wss://i11884f9.ala.cn-hangzhou.emqxsl.cn:8084/mqtt";
-const mqtt_port = 8084;
 const mqttUser   = "esp-switch01";
 const mqttPasswd = "switch666888";
 const CMD_TOPIC  = "light/switch/cmd";
 const STATE_TOPIC= "light/switch/state";
+const HEARTBEAT_TOPIC = "device/heartbeat"; //ESP心跳上报主题
+const HEARTBEAT_TIMEOUT = 1500; // 1秒收不到心跳判定离线
 // =========================================================
-
 const connTip = document.getElementById("connTip");
 const stateText = document.getElementById("stateText");
+const hwStateText = document.getElementById("hwStateText");
+
+let lastHeartbeatTime = 0;
+let heartbeatTimer = null;
 
 // 创建连接
 const client = mqtt.connect(mqttWsUrl,{
     username:mqttUser,
     password:mqttPasswd,
-    clientId:"web_switch_"+Math.random().toString(36).slice(2,12)
+    clientId:"web_switch_"+Math.random().toString(36).slice(2,12),
+    connectTimeout:10000,
+    keepalive:10
 });
+
+// 更新硬件在线离线UI
+function setHwOnline(isOnline){
+    if(isOnline){
+        hwStateText.innerText = "🟢在线";
+        hwStateText.style.color="#2ecc71";
+    }else{
+        hwStateText.innerText = "🔴离线";
+        hwStateText.style.color="#ff6b6b";
+    }
+}
+
+// 心跳检测循环
+function startHeartbeatCheck(){
+    if(heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(()=>{
+        const now = Date.now();
+        if(now - lastHeartbeatTime > HEARTBEAT_TIMEOUT){
+            setHwOnline(false);
+        }
+    },600);
+}
 
 // 连接成功
 client.on("connect",()=>{
     connTip.innerText = "✅ MQTT服务器连接成功";
     client.subscribe(STATE_TOPIC);
+    client.subscribe(HEARTBEAT_TOPIC);
+    startHeartbeatCheck();
 });
 
-// 接收设备上报状态
+// 接收消息
 client.on("message",(topic,payload)=>{
     const msg = payload.toString().trim();
-    stateText.innerText = msg;
-    if(msg === "ON") stateText.style.color="#2ecc71";
-    else stateText.style.color="#ff6b6b";
+    if(topic === HEARTBEAT_TOPIC){
+        //收到ESP心跳包，标记设备在线
+        lastHeartbeatTime = Date.now();
+        setHwOnline(true);
+        return;
+    }
+    if(topic === STATE_TOPIC){
+        stateText.innerText = msg;
+        if(msg === "ON") stateText.style.color="#2ecc71";
+        else stateText.style.color="#ff6b6b";
+    }
 });
 
 // 连接失败
 client.on("error",(err)=>{
     connTip.innerText = "❌ 连接失败，请检查地址/账号";
     console.error(err);
+});
+
+// web断开mqtt时置设备未知
+client.on("close",()=>{
+    hwStateText.innerText="未知";
+    hwStateText.style.color="#cccccc";
+    if(heartbeatTimer) clearInterval(heartbeatTimer);
 });
 
 // 发送开关指令
