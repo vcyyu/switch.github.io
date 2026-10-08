@@ -342,7 +342,7 @@ btnOta.onclick = ()=>{
     otaProgressText.innerText = "0%";
 
     const reader = new FileReader();
-    const chunkSize = 512;
+    const chunkSize = 1024;
 
     reader.onload = (e)=>{
         const arrayBuffer = e.target.result;
