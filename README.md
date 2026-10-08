@@ -11,4 +11,6 @@
 项目/
 ├── esp8266_switch.ino      # ESP8266 固件代码（Arduino IDE）
 └── index.html              # 网页控制面板
+![Uploading image.png…]()
+
 
