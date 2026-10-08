@@ -16,6 +16,7 @@
 项目/
 ├── esp8266_switch.ino      # ESP8266 固件代码（Arduino IDE）
 └── index.html              # 网页控制面板
+
 <img width="594" height="856" alt="7556ad90-60df-4816-ac25-aed58a3c2382" src="https://github.com/user-attachments/assets/72af0646-8988-4951-b36b-61c6ef827581" />
 
 
