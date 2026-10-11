@@ -375,12 +375,9 @@ btnOta.onclick = ()=>{
             });
             client.publish(OTA_DATA_TOPIC, dataMsg);
 
-            const percent = Math.round(((chunkIndex + 1) / totalChunks) * 100);
-            otaProgressFill.style.width = percent + "%";
-            otaProgressText.innerText = percent + "%";
-
-            chunkIndex++;
+           chunkIndex++;
             setTimeout(sendChunk, 30);
+    // ↑ 网页只管发，进度由 ESP 反馈
         };
         sendChunk();
     };
