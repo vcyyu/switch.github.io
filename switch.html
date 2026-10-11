@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>物联网开关控制面板 V3.2</title>
+<title>物联网开关控制面板 V3.3</title>
 <script src="https://cdn.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;}
@@ -344,7 +344,7 @@ btnOta.onclick = ()=>{
     otaProgressText.innerText = "0%";
 
     const reader = new FileReader();
-    const chunkSize = 1024;
+    const chunkSize = 2048;
 
     reader.onload = (e)=>{
         const arrayBuffer = e.target.result;
