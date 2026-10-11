@@ -284,13 +284,15 @@ client.on("message", (topic, payload)=>{
             otaProgressText.innerText = percent + "%";
         } else if(msg === "done"){
             otaProgressFill.style.width = "100%";
-            otaProgressText.innerText = "100% (完成)";
+            otaProgressText.innerText = "100% (烧录成功！)";
+            otaProgressText.style.color = "#2ecc71";        // ✅ 完成：绿色
             setTimeout(()=>{
                 otaProgressBar.style.display = "none";
                 otaProgressText.style.display = "none";
             }, 3000);
         } else if(msg === "error"){
             otaProgressText.innerText = "OTA失败";
+            otaProgressText.style.color = "#ff6b6b";        // ❌ 失败：红色
             otaProgressFill.style.width = "0%";
             setTimeout(()=>{
                 otaProgressBar.style.display = "none";
