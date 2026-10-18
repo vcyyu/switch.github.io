@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>物联网开关控制面板 · OTA + 脉冲</title>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@4.3.7/dist/mqtt.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;}
+body{
+    min-height:100vh;
+    background: linear-gradient(145deg,#0f1420,#1a2436);
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    color:#fff; padding:20px;
+}
+.wrap{ width:100%; max-width:460px; }
+.card{
+    background:rgba(255,255,255,0.06);
+    backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:24px;
+    padding:36px 28px;
+    box-shadow:0 10px 40px rgba(0,0,0,0.35);
+}
+.title{ text-align:center; font-size:24px; margin-bottom:20px; letter-spacing:1px; }
+
+/* ===== 设备选择下拉框 ===== */
+.device-selector {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 16px;
+    margin-bottom: 20px;
+    outline: none;
+    cursor: pointer;
+}
+.device-selector option {
+    background: #1a2436;
+    color: #fff;
+}
+
+/* ===== 状态区 ===== */
+.status-box{
+    text-align:center; padding:16px; border-radius:16px;
+    background:rgba(255,255,255,0.05); margin-bottom:28px; font-size:18px;
+}
+.hw-status{ margin-bottom:10px; font-size:17px; }
+#hwStateText{ font-weight:bold; }
+#stateText{ font-weight:bold; font-size:20px; color:#ff6b6b; }
+
+/* ===== 开关按钮组 ===== */
+.btn-group{
+    display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:18px;
+}
+button{
+    border:none; padding:18px 0; border-radius:14px;
+    font-size:19px; font-weight:bold; cursor:pointer;
+    transition:0.22s ease;
+    letter-spacing:0.5px;
+}
+#btnOn{ background:linear-gradient(135deg,#27ae60,#2ecc71); color:white; }
+#btnOff{ background:linear-gradient(135deg,#c0392b,#e74c3c); color:white; }
+button:active{ transform:scale(0.97); }
+button:disabled{ opacity:0.45; transform:none; cursor:not-allowed; }
+
+/* ===== 脉冲按钮：居中、宽度收缩 ===== */
+.pulse-btn-wrap{
+    display:flex;
+    justify-content:center;
+    margin-bottom:26px;
+}
+#btnPulse{
+    width: 90%;
+    max-width: 360px;
+    background:linear-gradient(135deg,#8e44ad,#9b59b6);
+    color:white;
+    padding:16px 0;
+    font-size:17px;
+    border-radius:14px;
+    box-shadow:0 6px 18px rgba(155,89,182,0.35);
+}
+#btnPulse:hover{ filter:brightness(1.08); }
+
+/* ===== 连接提示 ===== */
+.connect-tip{ text-align:center; margin-top:24px; font-size:14px; opacity:0.75; }
+
+/* ===== OTA 区域 ===== */
+.ota-area{
+    margin-top:10px; padding-top:22px;
+    border-top:1px solid rgba(255,255,255,0.1);
+}
+.ota-title{
+    font-size:16px; margin-bottom:16px;
+    text-align:center; opacity:0.92; letter-spacing:0.5px;
+}
+
+.file-input{
+    width:100%;
+    padding:14px 14px;
+    background:rgba(255,255,255,0.06);
+    border:1.5px dashed rgba(255,255,255,0.35);
+    border-radius:12px;
+    color:#fff;
+    font-size:14px;
+    margin-bottom:16px;
+    cursor:pointer;
+    transition:0.2s;
+}
+.file-input:hover{
+    border-color:rgba(255,255,255,0.6);
+    background:rgba(255,255,255,0.09);
+}
+.file-input::file-selector-button{
+    background:linear-gradient(135deg,#34495e,#2c3e50);
+    color:#fff;
+    border:1.5px solid rgba(255,255,255,0.35);
+    padding:9px 18px;
+    border-radius:9px;
+    margin-right:14px;
+    cursor:pointer;
+    font-weight:bold;
+    font-size:14px;
+    transition:0.2s;
+}
+.file-input::file-selector-button:hover{
+    border-color:#fff;
+    background:linear-gradient(135deg,#3d566e,#34495e);
+    transform:translateY(-1px);
+}
+
+#btnOta{
+    background:linear-gradient(135deg,#e67e22,#f39c12);
+    color:white;
+    width:100%;
+    padding:16px 0;
+    font-size:18px;
+    border-radius:14px;
+    box-shadow:0 6px 18px rgba(230,126,34,0.3);
+}
+#btnOta:hover:not(:disabled){ filter:brightness(1.08); }
+
+.progress-bar{
+    width:100%; height:8px;
+    background:rgba(255,255,255,0.1);
+    border-radius:10px; margin-top:14px;
+    overflow:hidden; display:none;
+}
+.progress-fill{
+    height:100%; width:0%;
+    background:linear-gradient(90deg,#2ecc71,#27ae60);
+    border-radius:10px; transition:width 0.3s ease;
+}
+.progress-text{
+    font-size:13px; text-align:center;
+    margin-top:8px; opacity:0.85; display:none;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="card">
+        <h2 class="title">IOT综合控制面板</h2>
+
+        <!-- 设备选择下拉框 -->
+        <select id="deviceSelect" class="device-selector">
+            <option value="esp01_switch_001">设备 01 (esp01_switch_001)</option>
+            <option value="esp01_switch_002">设备 02 (esp01_switch_002)</option>
+            <option value="esp01_switch_003">设备 02 (esp01_switch_003)</option>
+            <option value="esp01_switch_004">设备 02 (esp01_switch_004)</option>
+            <option value="esp01_switch_005">设备 02 (esp01_switch_005)</option>
+            <option value="esp01_switch_006">设备 02 (esp01_switch_006)</option>
+        </select>
+
+        <div class="status-box">
+            <div class="hw-status">
+                ESP设备状态：<span id="hwStateText">未知</span>
+            </div>
+            当前设备状态：<span id="stateText">等待指令...</span>
+        </div>
+
+        <!-- 开关按钮 -->
+        <div class="btn-group">
+            <button id="btnOn">开启 ON</button>
+            <button id="btnOff">关闭 OFF</button>
+        </div>
+
+        <!-- GPIO5 脉冲按钮（居中） -->
+        <div class="pulse-btn-wrap">
+            <button id="btnPulse">⚡ 触发GPIO5脉冲（低电平600ms）</button>
+        </div>
+
+        <!-- OTA -->
+        <div class="ota-area">
+            <div class="ota-title">📦 OTA 固件升级</div>
+            <input type="file" id="otaFile" class="file-input" accept=".bin">
+            <button id="btnOta">开始烧录</button>
+            <div class="progress-bar" id="otaProgressBar">
+                <div class="progress-fill" id="otaProgressFill"></div>
+            </div>
+            <div class="progress-text" id="otaProgressText">0%</div>
+        </div>
+    </div>
+    <div class="connect-tip" id="connTip">MQTT 正在连接服务器</div>
+</div>
+
+<script>
+// ============【改成你自己的EMQX Cloud信息】============
+const mqttWsUrl  = "wss://i11884f9.ala.cn-hangzhou.emqxsl.cn:8084/mqtt";
+const mqttUser   = "esp-switch01"; // 这里填能够订阅所有设备的账号，或者留空
+const mqttPasswd = "switch666888";
+// =====================================================
+
+// 获取DOM元素
+const deviceSelect  = document.getElementById("deviceSelect");
+const connTip       = document.getElementById("connTip");
+const stateText     = document.getElementById("stateText");
+const hwStateText   = document.getElementById("hwStateText");
+const btnPulse      = document.getElementById("btnPulse");
+const otaFileInput  = document.getElementById("otaFile");
+const btnOta        = document.getElementById("btnOta");
+const otaProgressBar  = document.getElementById("otaProgressBar");
+const otaProgressFill = document.getElementById("otaProgressFill");
+const otaProgressText = document.getElementById("otaProgressText");
+
+let lastHeartbeatTime = 0;
+let heartbeatTimer = null;
+let client = null; 
+
+// 定义动态的 Topics
+let CMD_TOPIC, STATE_TOPIC, HEARTBEAT_TOPIC, PULSE_CMD_TOPIC, OTA_TOPIC, OTA_DATA_TOPIC, OTA_STATUS_TOPIC;
+const HEARTBEAT_TIMEOUT = 5000;
+
+// 初始禁用
+btnOta.disabled = true;
+btnPulse.disabled = true;
+
+// 更新 Topic 的函数
+function updateTopics(deviceId) {
+    CMD_TOPIC        = `light/switch/cmd/${deviceId}`;
+    STATE_TOPIC      = `light/switch/state/${deviceId}`;
+    HEARTBEAT_TOPIC  = `device/heartbeat/${deviceId}`;
+    PULSE_CMD_TOPIC  = `device/gpio5/pulse/${deviceId}`;
+    OTA_TOPIC        = `device/ota/${deviceId}`;
+    OTA_DATA_TOPIC   = `device/ota/data/${deviceId}`;
+    OTA_STATUS_TOPIC = `device/ota/status/${deviceId}`;
+}
+
+function setHwOnline(isOnline){
+    if(isOnline){
+        hwStateText.innerText = "🟢在线";
+        hwStateText.style.color = "#2ecc71";
+        btnOta.disabled = false;
+        btnPulse.disabled = false;
+    } else {
+        hwStateText.innerText = "🔴离线";
+        hwStateText.style.color = "#ff6b6b";
+        btnOta.disabled = true;
+        btnPulse.disabled = true;
+    }
+}
+
+function startHeartbeatCheck(){
+    if(heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(()=>{
+        const now = Date.now();
+        if(now - lastHeartbeatTime > HEARTBEAT_TIMEOUT){
+            setHwOnline(false);
+        }
+    }, 1000);
+}
+
+// 连接 MQTT 的核心函数
+function connectMQTT() {
+    // 如果之前有连接，先断开
+    if (client) {
+        client.end(true); 
+    }
+    
+    connTip.innerText = "MQTT 正在连接服务器...";
+    setHwOnline(false); // 重置状态
+    
+    client = mqtt.connect(mqttWsUrl,{
+        username: mqttUser,
+        password: mqttPasswd,
+        clientId: "web_switch_" + Math.random().toString(36).slice(2,12),
+        connectTimeout: 10000,
+        keepalive: 10
+    });
+
+    client.on("connect", ()=>{
+        connTip.innerText = "✅ 已连接到: " + deviceSelect.value;
+        client.subscribe(STATE_TOPIC);
+        client.subscribe(HEARTBEAT_TOPIC);
+        client.subscribe(OTA_STATUS_TOPIC);
+        startHeartbeatCheck();
+    });
+
+    client.on("message", (topic, payload)=>{
+        const msg = payload.toString().trim();
+
+        if(topic === HEARTBEAT_TOPIC){
+            lastHeartbeatTime = Date.now();
+            setHwOnline(true);
+            return;
+        }
+        if(topic === STATE_TOPIC){
+            stateText.innerText = msg;
+            if(msg === "ON") stateText.style.color = "#2ecc71";
+            else stateText.style.color = "#ff6b6b";
+        }
+        if(topic === OTA_STATUS_TOPIC){
+            console.log("OTA状态:", msg);
+            if(msg.startsWith("progress:")){
+                const percent = msg.split(":")[1];
+                otaProgressBar.style.display = "block";
+                otaProgressText.style.display = "block";
+                otaProgressFill.style.width = percent + "%";
+                otaProgressText.innerText = percent + "%";
+            } else if(msg === "done"){
+                otaProgressFill.style.width = "100%";
+                otaProgressText.innerText = "100% (完成)";
+                setTimeout(()=>{
+                    otaProgressBar.style.display = "none";
+                    otaProgressText.style.display = "none";
+                }, 3000);
+            } else if(msg === "error"){
+                otaProgressText.innerText = "OTA失败";
+                otaProgressFill.style.width = "0%";
+                setTimeout(()=>{
+                    otaProgressBar.style.display = "none";
+                    otaProgressText.style.display = "none";
+                }, 3000);
+            }
+        }
+    });
+
+    client.on("error", (err)=>{
+        connTip.innerText = "❌ 连接失败，请检查地址/账号";
+        console.error(err);
+    });
+
+    client.on("close", ()=>{
+        hwStateText.innerText = "未知";
+        hwStateText.style.color = "#cccccc";
+        if(heartbeatTimer) clearInterval(heartbeatTimer);
+        setHwOnline(false);
+    });
+}
+
+// 下拉框切换事件
+deviceSelect.addEventListener("change", (e) => {
+    const selectedDevice = e.target.value;
+    stateText.innerText = "等待指令..."; // 清空旧状态
+    stateText.style.color = "#ff6b6b";
+    
+    // 更新 Topic 并重连
+    updateTopics(selectedDevice);
+    connectMQTT();
+});
+
+// 首次加载初始化
+updateTopics(deviceSelect.value);
+connectMQTT();
+
+// 开关
+document.getElementById("btnOn").onclick = ()=>{
+    if(client && client.connected) client.publish(CMD_TOPIC, "ON");
+};
+document.getElementById("btnOff").onclick = ()=>{
+    if(client && client.connected) client.publish(CMD_TOPIC, "OFF");
+};
+
+// GPIO5 脉冲
+btnPulse.onclick = ()=>{
+    if(!client || !client.connected) return;
+    client.publish(PULSE_CMD_TOPIC, "pulse:600");
+    btnPulse.innerText = "⚡ 已触发脉冲";
+    setTimeout(()=>{
+        btnPulse.innerText = "⚡ 触发GPIO5脉冲（低电平600ms）";
+    }, 600);
+};
+
+// OTA
+btnOta.onclick = ()=>{
+    const file = otaFileInput.files[0];
+    if(!file){ alert("请先选择 .bin 固件文件"); return; }
+    if(!client || !client.connected){ alert("MQTT未连接，无法OTA"); return; }
+
+    otaProgressBar.style.display = "block";
+    otaProgressText.style.display = "block";
+    otaProgressFill.style.width = "0%";
+    otaProgressText.innerText = "0%";
+
+    const reader = new FileReader();
+    const chunkSize = 1024;
+
+    reader.onload = (e)=>{
+        const arrayBuffer = e.target.result;
+        const totalBytes = arrayBuffer.byteLength;
+        const totalChunks = Math.ceil(totalBytes / chunkSize);
+
+        const startMsg = JSON.stringify({
+            cmd: "ota_start",
+            size: totalBytes,
+            chunkSize: chunkSize
+        });
+        client.publish(OTA_TOPIC, startMsg);
+
+        let chunkIndex = 0;
+        const sendChunk = ()=>{
+            if(chunkIndex >= totalChunks){
+                client.publish(OTA_TOPIC, JSON.stringify({cmd: "ota_end"}));
+                return;
+            }
+            const start = chunkIndex * chunkSize;
+            const end = Math.min(start + chunkSize, totalBytes);
+            const chunk = arrayBuffer.slice(start, end);
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(chunk)));
+            const dataMsg = JSON.stringify({
+                cmd: "ota_data",
+                seq: chunkIndex,
+                data: base64
+            });
+            client.publish(OTA_DATA_TOPIC, dataMsg);
+
+            const percent = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+            otaProgressFill.style.width = percent + "%";
+            otaProgressText.innerText = percent + "%";
+
+            chunkIndex++;
+            setTimeout(sendChunk, 30);
+        };
+        sendChunk();
+    };
+
+    reader.onerror = ()=>{
+        alert("读取文件失败");
+        otaProgressBar.style.display = "none";
+        otaProgressText.style.display = "none";
+    };
+
+    reader.readAsArrayBuffer(file);
+};
+</script>
+</body>
+</html>
